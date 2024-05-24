@@ -1,0 +1,50 @@
+from flask import Flask, request, jsonify
+import requests
+
+app = Flask(__name__)
+
+# Pyrus API токен
+PYRUS_API_TOKEN = 'your_pyrus_api_token'
+
+# URL для вызова Pyrus API
+PYRUS_API_URL = 'https://api.pyrus.com/v4'
+
+def get_task(task_id):
+    headers = {
+        'Authorization': f'Bearer {PYRUS_API_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    response = requests.get(f'{PYRUS_API_URL}/tasks/{task_id}', headers=headers)
+    return response.json()
+
+def reassign_task(task_id, stage_id):
+    headers = {
+        'Authorization': f'Bearer {PYRUS_API_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'task_id': task_id,
+        'stage_id': stage_id
+    }
+    response = requests.post(f'{PYRUS_API_URL}/tasks/{task_id}/move', headers=headers, json=data)
+    return response.json()
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.json
+
+    # Логика обработки события
+    if data['event'] == 'form_field_updated':
+        task_id = data['task_id']
+        field_value = data['form_data']['fields'][0]['value']  # Предполагаем, что нужное поле первое
+
+        if field_value.lower() == 'да':
+            task_info = get_task(task_id)
+            second_stage_id = task_info['form']['stages'][1]['id']  # Предполагаем, что второй этап имеет индекс 1
+            reassign_task(task_id, second_stage_id)
+            return jsonify(status='success', message='Task reassigned to second stage')
+
+    return jsonify(status='success', message='No action taken')
+
+if __name__ == '__main__':
+    app.run(port=5000)
